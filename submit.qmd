@@ -1,28 +1,215 @@
 ---
-title: ""
-author: ""
+title: "Lab 10"
+author: "Katrina Ninh"
 format:
   html:
     embed-resources: true
 ---
 
-## Quarto
+## Lab 10 - SQL
 
-Quarto enables you to weave together content and executable code into a finished document. To learn more about Quarto see <https://quarto.org>.
-
-## Running Code
-
-When you click the **Render** button a document will be generated that includes both content and the output of embedded code. You can embed code like this:
+##Setup
 
 ```{r}
-1 + 1
+
+library(RSQLite)
+library(DBI)
+
+# Initialize a temporary in memory database
+con <- dbConnect(SQLite(), ":memory:")
+
+if (!file.exists("actor.csv"))
+  download.file(
+    url = "https://raw.githubusercontent.com/ivanceras/sakila/master/csv-sakila-db/actor.csv",
+    destfile = "actor.csv",
+    method   = "libcurl",
+    timeout  = 60
+    )
+actor <- read.csv("actor.csv")
+
+
+if (!file.exists("rental"))
+  download.file(
+    url = "https://raw.githubusercontent.com/ivanceras/sakila/master/csv-sakila-db/rental.csv",
+    destfile = "rental.csv",
+    method   = "libcurl",
+    timeout  = 60
+    )
+rental <- read.csv("rental.csv")
+
+
+if (!file.exists("customer.csv"))
+  download.file(
+    url = "https://raw.githubusercontent.com/ivanceras/sakila/master/csv-sakila-db/customer.csv",
+    destfile = "customer.csv",
+    method   = "libcurl",
+    timeout  = 60
+    )
+customer <- read.csv("customer.csv")
+
+
+if (!file.exists("payment.csv"))
+  download.file(
+    url = "https://raw.githubusercontent.com/ivanceras/sakila/master/csv-sakila-db/payment_p2007_01.csv",
+    destfile = "payment.csv",
+    method   = "libcurl",
+    timeout  = 60
+    )
+payment <- read.csv("payment.csv")
+
+# Copy data.frames to database
+dbWriteTable(con, "actor", actor)
+dbWriteTable(con, "rental", rental)
+dbWriteTable(con, "customer", customer)
+dbWriteTable(con, "payment", payment)
+
+dbListTables(con)
+
+##head (actor)
+##head (rental)
+##head (customer)
+##head (payment)
+
 ```
 
-You can add options to executable code like this
+## Question 1
+Edit the code below to retrieve the actor ID, first name and last name for all actors using the actor table. Sort by last name and then by first name
 
 ```{r}
-#| echo: false
-2 * 2
+
+dbGetQuery(con, "SELECT actor_id, first_name, last_name FROM actor ORDER BY last_name, first_name LIMIT 5;")
+
 ```
 
-The `echo: false` option disables the printing of code (only output is displayed).
+## Question 2
+Retrieve the actor ID, first name, and last name for actors whose last name equals ‘WILLIAMS’ or ‘DAVIS’.
+
+```{r}
+
+dbGetQuery(con, "SELECT actor_id, first_name, last_name FROM actor WHERE last_name IN ('WILLIAMS', 'DAVIS')")
+
+
+```
+
+## Question 3
+Write a query against the rental table that returns the IDs of the customers who rented a film on July 5, 2005 (use the rental.rental_date column, and you can use the date() function to ignore the time component). Include a single row for each distinct customer ID.
+
+```{r}
+
+dbGetQuery(con, "SELECT customer_id, rental_date FROM rental WHERE rental_date BETWEEN DATE('2005-07-05') AND DATE('2005-07-06')")
+
+```
+
+## Question 4.1
+Construct a query that retrieves all rows from the payment table where the amount is either 1.99, 7.99, 9.99.
+
+```{r}
+dbGetQuery(con, "SELECT * FROM payment WHERE amount IN (1.99,7.99,9.99) limit 20")
+
+
+```
+
+## Question 4.2
+Construct a query that retrieves all rows from the payment table where the amount is greater then 5
+
+```{r}
+dbGetQuery(con, "SELECT * FROM payment WHERE amount > 5 and amount < 8 limit 20")
+
+```
+
+## Question 5
+Retrieve all the payment IDs and their amounts from the customers whose last name is ‘DAVIS’.
+
+
+```{r}
+
+dbGetQuery(con, "SELECT payment_id, amount  FROM payment INNER JOIN customer ON payment.customer_id = customer.customer_id WHERE customer.last_name = 'DAVIS'")
+
+```
+
+## Question 6.1
+Use COUNT(*) to count the number of rows in rental.
+
+```{r}
+
+dbGetQuery(con, "SELECT count(*) FROM rental")
+
+```
+
+## Question 6.2
+Use COUNT(*) and GROUP BY to count the number of rentals for each customer_id.
+
+
+```{r}
+
+dbGetQuery(con, "SELECT customer_id, count(*) FROM rental GROUP BY customer_id  LIMIT 10;")
+
+```
+
+
+## Question 6.3
+Repeat the previous query and sort by the count in descending order.
+
+```{r}
+
+dbGetQuery(con, "SELECT customer_id, count(*) FROM rental GROUP BY customer_id ORDER BY count(*)  DESC  LIMIT 10;")
+
+```
+
+
+## Question 6.4
+Repeat the previous query but use HAVING to only keep the groups with 40 or more.
+
+```{r}
+dbGetQuery(con, "SELECT customer_id, count(*) FROM rental GROUP BY customer_id HAVING count(*) > 40 ORDER BY count(*)  DESC")
+
+```
+
+
+## Question 7
+Write a query that calculates a number of summary statistics for the payment table using MAX, MIN, AVG and SUM
+
+```{r}
+
+dbGetQuery(con, "SELECT MIN(amount), MAX(amount), AVG(amount), SUM(amount) FROM payment  LIMIT 10;")
+
+```
+
+
+## Question 7.1
+Modify the above query to do those calculations for each customer_id.
+
+```{r}
+
+dbGetQuery(con, "SELECT customer_id, MIN(amount), MAX(amount), AVG(amount), SUM(amount) FROM payment GROUP BY customer_id LIMIT 10;")
+
+
+```
+
+
+## Question 7.2
+Modify the above query to only keep the customer_ids that have more then 5 payments
+
+```{r}
+
+dbGetQuery(con, "SELECT customer_id, COUNT(*), MIN(amount), MAX(amount), AVG(amount), SUM(amount) FROM payment GROUP BY customer_id HAVING COUNT(*) > 5")
+
+```
+
+
+
+##Cleanup
+
+```{r}
+# clean up
+dbDisconnect(con)
+```
+
+
+
+
+
+
+
+
+
